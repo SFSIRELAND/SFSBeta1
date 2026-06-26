@@ -1,0 +1,9 @@
+{
+  "name": "sfs-tracker-api",
+  "version": "1.0.0",
+  "description": "Server-side RBAC + SharePoint data API for SFS SAF Compliance Tracker",
+  "main": "data/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
