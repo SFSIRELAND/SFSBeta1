@@ -11,7 +11,7 @@
         },
         "login": {
           "loginParameters": [
-            ""scope=openid profile email offline_access"
+            "scope=openid profile email offline_access"
           ]
         }
       }
