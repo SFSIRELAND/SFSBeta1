@@ -164,6 +164,7 @@ function identityOf(p) {
 
 function roleOf(roles) {
   if (roles.includes('sfs.admin')) return 'admin';
+  if (roles.includes('sfs.supervisor')) return 'admin'; // supervisor = full admin privileges
   if (roles.includes('auditor')) return 'auditor';
   if (roles.includes('client.editor')) return 'client';
   return 'client'; // authenticated but unassigned → least privilege, never admin
