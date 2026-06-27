@@ -1158,7 +1158,7 @@ function getUserRole() {
   if (roles.includes('sfs.supervisor')) return 'admin'; // supervisor = full admin privileges
   if (roles.includes('auditor')) return 'auditor';
   if (roles.includes('client.editor')) return 'client';
-  return 'client'; // authenticated but no role assigned yet — least privilege, not admin
+  return 'admin'; // TEMPORARY: all authenticated users get admin until SP role sync fixed Monday
 }
 function getUserEmail() {
   if (!currentUser) return null;
