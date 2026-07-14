@@ -6,8 +6,7 @@
 <title>SFS SAF Compliance Tracker™</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- MSAL for Graph token acquisition -->
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<!-- Graph token via Easy Auth token store -->
 <style>
 
 :root{
@@ -579,44 +578,26 @@ let _graphToken = null;
 let _spSiteIdResolved = null;
 let _spListId = null;
 
-// MSAL instance for Graph token acquisition
-let _msalInstance = null;
-function getMsalInstance() {
-  if (_msalInstance) return _msalInstance;
-  _msalInstance = new msal.PublicClientApplication({
-    auth: {
-      clientId: CONFIG.clientId,
-      authority: 'https://login.microsoftonline.com/' + CONFIG.tenantId,
-      redirectUri: CONFIG.redirectUri,
-    },
-    cache: { cacheLocation: 'sessionStorage' }
-  });
-  return _msalInstance;
-}
-
 async function getGraphToken() {
   if (_graphToken) return _graphToken;
   try {
-    const msalApp = getMsalInstance();
-    await msalApp.initialize();
-    const accounts = msalApp.getAllAccounts();
-    const request = {
-      scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
-      account: accounts[0] || undefined
-    };
-    let result;
-    try {
-      // Try silent first
-      result = await msalApp.acquireTokenSilent(request);
-    } catch(e) {
-      // Silent failed — acquire via popup
-      result = await msalApp.acquireTokenPopup(request);
+    // Easy Auth token store — requires token store enabled on SWA
+    const r = await fetch('/.auth/token', {
+      method: 'GET',
+      headers: { 'X-MS-TOKEN-AAD-ACCESS-TOKEN': '1' }
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.access_token) { _graphToken = d.access_token; return _graphToken; }
     }
-    if (result?.accessToken) {
-      _graphToken = result.accessToken;
+    // Fallback: check /.auth/me
+    const r2 = await fetch('/.auth/me');
+    const d2 = await r2.json();
+    if (d2.clientPrincipal?.accessToken) {
+      _graphToken = d2.clientPrincipal.accessToken;
       return _graphToken;
     }
-  } catch(e) { console.error('getGraphToken (MSAL) error:', e); }
+  } catch(e) { console.error('getGraphToken error:', e); }
   return null;
 }
 
