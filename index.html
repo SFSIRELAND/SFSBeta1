@@ -6,7 +6,8 @@
 <title>SFS SAF Compliance Tracker™</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- Easy Auth: no MSAL CDN needed -->
+<!-- MSAL for Graph token acquisition -->
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <style>
 
 :root{
@@ -578,22 +579,44 @@ let _graphToken = null;
 let _spSiteIdResolved = null;
 let _spListId = null;
 
+// MSAL instance for Graph token acquisition
+let _msalInstance = null;
+function getMsalInstance() {
+  if (_msalInstance) return _msalInstance;
+  _msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CONFIG.clientId,
+      authority: 'https://login.microsoftonline.com/' + CONFIG.tenantId,
+      redirectUri: CONFIG.redirectUri,
+    },
+    cache: { cacheLocation: 'sessionStorage' }
+  });
+  return _msalInstance;
+}
+
 async function getGraphToken() {
   if (_graphToken) return _graphToken;
   try {
-    const r = await fetch('/.auth/me');
-    const d = await r.json();
-    // Easy Auth stores the Graph token in the token store
-    const token = d.clientPrincipal?.accessToken || null;
-    if (token) { _graphToken = token; return token; }
-    // Fallback: request token for Graph resource
-    const tr = await fetch('/.auth/token?resource=https://graph.microsoft.com');
-    if (tr.ok) {
-      const td = await tr.json();
-      _graphToken = td.access_token || null;
+    const msalApp = getMsalInstance();
+    await msalApp.initialize();
+    const accounts = msalApp.getAllAccounts();
+    const request = {
+      scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
+      account: accounts[0] || undefined
+    };
+    let result;
+    try {
+      // Try silent first
+      result = await msalApp.acquireTokenSilent(request);
+    } catch(e) {
+      // Silent failed — acquire via popup
+      result = await msalApp.acquireTokenPopup(request);
+    }
+    if (result?.accessToken) {
+      _graphToken = result.accessToken;
       return _graphToken;
     }
-  } catch(e) { console.error('getGraphToken error:', e); }
+  } catch(e) { console.error('getGraphToken (MSAL) error:', e); }
   return null;
 }
 
