@@ -1120,20 +1120,25 @@ function getUserName() {
 function getUserRole() {
   if (!currentUser) return 'demo'; // local/offline demo mode — full access for testing
 
-  // WORKAROUND: hardcoded admin by userId until SP role token claim is resolved.
-  // userId comes from /.auth/me and cannot be forged by the browser.
-  // Remove this block once sfs.supervisor flows correctly in the token.
-  const SFS_ADMIN_USERS = [
-    'db70483698d6404086f2edb83864197e', // Darren@sustainableflightsolutions.com
-  ];
-  if (SFS_ADMIN_USERS.includes(currentUser.userId)) return 'admin';
-
+  // Check userRoles first (standard SWA roles)
   const roles = currentUser.userRoles || [];
   if (roles.includes('sfs.admin')) return 'admin';
-  if (roles.includes('sfs.supervisor')) return 'admin'; // supervisor = full admin privileges
+  if (roles.includes('sfs.supervisor')) return 'admin';
   if (roles.includes('auditor')) return 'auditor';
   if (roles.includes('client.editor')) return 'client';
-  return 'client'; // authenticated but no role assigned yet — least privilege, not admin
+
+  // Also check claims array for role (AAD emits roles as claims)
+  const claims = currentUser.claims || [];
+  const roleClaims = claims
+    .filter(c => c.typ === 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role' ||
+                 c.typ === 'roles' || c.typ === 'role')
+    .map(c => c.val);
+  if (roleClaims.includes('sfs.admin')) return 'admin';
+  if (roleClaims.includes('sfs.supervisor')) return 'admin';
+  if (roleClaims.includes('auditor')) return 'auditor';
+  if (roleClaims.includes('client.editor')) return 'client';
+
+  return 'client'; // authenticated but no role assigned — least privilege
 }
 function getUserEmail() {
   if (!currentUser) return null;
