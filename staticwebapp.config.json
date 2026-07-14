@@ -1,1 +1,51 @@
-{"$schema":"https://json.schemastore.org/staticwebapp.config.json","routes":[{"route":"/.auth/login/aad","allowedRoles":["anonymous","authenticated"]},{"route":"/api/*","allowedRoles":["authenticated"]},{"route":"/*","allowedRoles":["authenticated"]}],"responseOverrides":{"401":{"redirect":"/.auth/login/aad","statusCode":302}},"globalHeaders":{"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'"},"navigationFallback":{"rewrite":"/index.html","exclude":["/api/*","/.auth/*"]},"platform":{"apiRuntime":"node:18"}}
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/a9edf58c-5d93-4da5-b4a4-4a3aeef97261/v2.0",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": [
+            "scope=openid profile email offline_access https://graph.microsoft.com/Sites.ReadWrite.All"
+          ]
+        }
+      }
+    }
+  },
+  "routes": [
+    {
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["authenticated"]
+    }
+  ],
+  "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/aad",
+      "statusCode": 302
+    }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://alcdn.msauth.net; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; img-src 'self' data: blob:"
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/.auth/*"]
+  },
+  "platform": {
+    "apiRuntime": "node:18"
+  }
+}
