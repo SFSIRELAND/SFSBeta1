@@ -22,10 +22,6 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
       "route": "/*",
       "allowedRoles": ["authenticated"]
     }
@@ -38,7 +34,7 @@
   },
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "/.auth/*"]
+    "exclude": ["/.auth/*"]
   },
   "platform": {
     "apiRuntime": "node:18"

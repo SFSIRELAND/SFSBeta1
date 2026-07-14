@@ -574,104 +574,19 @@ function msalLogout() {
 // Falls back to localStorage in demo/local mode.
 // ══════════════════════════════════════════════════
 const GRAPH = 'https://graph.microsoft.com/v1.0';
-let _graphToken = null;
-let _spSiteIdResolved = null;
-let _spListId = null;
-
-async function getGraphToken() {
-  if (_graphToken) return _graphToken;
-  try {
-    // Easy Auth token store — requires token store enabled on SWA
-    const r = await fetch('/.auth/token', {
-      method: 'GET',
-      headers: { 'X-MS-TOKEN-AAD-ACCESS-TOKEN': '1' }
-    });
-    if (r.ok) {
-      const d = await r.json();
-      if (d.access_token) { _graphToken = d.access_token; return _graphToken; }
-    }
-    // Fallback: check /.auth/me
-    const r2 = await fetch('/.auth/me');
-    const d2 = await r2.json();
-    if (d2.clientPrincipal?.accessToken) {
-      _graphToken = d2.clientPrincipal.accessToken;
-      return _graphToken;
-    }
-  } catch(e) { console.error('getGraphToken error:', e); }
-  return null;
-}
-
-async function resolveSpIds() {
-  if (_spSiteIdResolved && _spListId) return { siteId: _spSiteIdResolved, listId: _spListId };
-  const token = await getGraphToken();
-  if (!token) throw new Error('No Graph token');
-  const host = CONFIG.siteUrl.replace('https://','').split('/sites/')[0];
-  const path = '/sites/' + CONFIG.siteUrl.split('/sites/')[1];
-  const sr = await fetch(`${GRAPH}/sites/${host}:${path}`, { headers: { Authorization: 'Bearer ' + token } });
-  if (!sr.ok) throw new Error('Site lookup failed: ' + sr.status);
-  const siteId = (await sr.json()).id;
-  const lr = await fetch(`${GRAPH}/sites/${siteId}/lists?$filter=displayName eq '${CONFIG.listName}'`, { headers: { Authorization: 'Bearer ' + token } });
-  const lists = await lr.json();
-  const listId = lists.value?.[0]?.id;
-  if (!listId) throw new Error('List not found: ' + CONFIG.listName);
-  _spSiteIdResolved = siteId;
-  _spListId = listId;
-  return { siteId, listId };
-}
-
+// ══════════════════════════════════════════════════
+// STORAGE — localStorage for beta
+// Simple browser storage for 3-user beta.
+// SharePoint integration to follow once login is stable.
+// ══════════════════════════════════════════════════
 async function spGet(key) {
-  if (_spCache[key] !== undefined) return _spCache[key].v;
-  try {
-    const token = await getGraphToken();
-    if (!token) return localStorage.getItem('rsb_sp_' + key);
-    const { siteId, listId } = await resolveSpIds();
-    const r = await fetch(
-      `${GRAPH}/sites/${siteId}/lists/${listId}/items?$filter=fields/Title eq '${encodeURIComponent(key)}'&$expand=fields`,
-      { headers: { Authorization: 'Bearer ' + token, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } }
-    );
-    const d = await r.json();
-    const val = d.value?.[0]?.fields?.DataValue || null;
-    _spCache[key] = { v: val };
-    return val;
-  } catch(e) {
-    console.error('spGet error:', e);
-    return localStorage.getItem('rsb_sp_' + key);
-  }
+  return localStorage.getItem('rsb_' + key);
 }
 
 async function spSet(key, value) {
-  if (!SP_MODE || !currentUser) {
-    try { localStorage.setItem('rsb_sp_' + key, value); } catch(e) {}
-    return;
-  }
+  try { localStorage.setItem('rsb_' + key, value); } catch(e) {}
   showSaveInd();
-  try {
-    const token = await getGraphToken();
-    if (!token) throw new Error('No Graph token');
-    const { siteId, listId } = await resolveSpIds();
-    // Check if item exists
-    const r = await fetch(
-      `${GRAPH}/sites/${siteId}/lists/${listId}/items?$filter=fields/Title eq '${encodeURIComponent(key)}'&$expand=fields`,
-      { headers: { Authorization: 'Bearer ' + token, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } }
-    );
-    const d = await r.json();
-    const existing = d.value?.[0];
-    if (existing) {
-      await fetch(`${GRAPH}/sites/${siteId}/lists/${listId}/items/${existing.id}/fields`, {
-        method: 'PATCH',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ DataValue: value })
-      });
-    } else {
-      await fetch(`${GRAPH}/sites/${siteId}/lists/${listId}/items`, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: { Title: key, DataValue: value } })
-      });
-    }
-    _spCache[key] = { v: value };
-  } catch(e) { console.error('spSet error:', e); }
-  hideSaveInd();
+  setTimeout(hideSaveInd, 1000);
 }
 function showSaveInd() { const el=document.getElementById('save-ind');if(el)el.className='save-ind show'; }
 function hideSaveInd() { const el=document.getElementById('save-ind');if(el)el.className='save-ind'; }
