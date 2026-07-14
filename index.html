@@ -522,8 +522,6 @@ const SP_MODE = !CONFIG.clientId.includes('YOUR-CLIENT') &&
 
 let currentUser = null;
 let _spCache = {};
-let _spSiteId = null;
-let _spListId = null;
 let _demoBanner = true;
 
 async function initApp() {
@@ -569,33 +567,71 @@ function msalLogout() {
   window.location.href = '/.auth/logout?post_logout_redirect_uri=/';
 }
 
-// NOTE: the browser deliberately no longer obtains a Graph token.
-// All SharePoint access happens server-side in /api/data, which does
-// the OBO exchange itself. Exposing a Graph token to the browser was
-// the original security hole and has been removed.
+// ══════════════════════════════════════════════════
+// DIRECT GRAPH / SHAREPOINT STORAGE
+// Beta simplification: browser calls Graph directly using the
+// token Easy Auth provides via /.auth/me. No Functions needed.
+// Falls back to localStorage in demo/local mode.
+// ══════════════════════════════════════════════════
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+let _graphToken = null;
+let _spSiteIdResolved = null;
+let _spListId = null;
 
-// ══════════════════════════════════════════════════
-// SERVER-SIDE DATA API
-// All persistence now goes through /api/data — a Function that
-// verifies identity from x-ms-client-principal (un-forgeable) and
-// enforces operator scope SERVER-SIDE before touching SharePoint.
-// The browser no longer holds a Graph token or calls Graph directly.
-// In demo/local mode (SP_MODE false) we fall back to localStorage.
-// ══════════════════════════════════════════════════
+async function getGraphToken() {
+  if (_graphToken) return _graphToken;
+  try {
+    const r = await fetch('/.auth/me');
+    const d = await r.json();
+    // Easy Auth stores the Graph token in the token store
+    const token = d.clientPrincipal?.accessToken || null;
+    if (token) { _graphToken = token; return token; }
+    // Fallback: request token for Graph resource
+    const tr = await fetch('/.auth/token?resource=https://graph.microsoft.com');
+    if (tr.ok) {
+      const td = await tr.json();
+      _graphToken = td.access_token || null;
+      return _graphToken;
+    }
+  } catch(e) { console.error('getGraphToken error:', e); }
+  return null;
+}
+
+async function resolveSpIds() {
+  if (_spSiteIdResolved && _spListId) return { siteId: _spSiteIdResolved, listId: _spListId };
+  const token = await getGraphToken();
+  if (!token) throw new Error('No Graph token');
+  const host = CONFIG.siteUrl.replace('https://','').split('/sites/')[0];
+  const path = '/sites/' + CONFIG.siteUrl.split('/sites/')[1];
+  const sr = await fetch(`${GRAPH}/sites/${host}:${path}`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!sr.ok) throw new Error('Site lookup failed: ' + sr.status);
+  const siteId = (await sr.json()).id;
+  const lr = await fetch(`${GRAPH}/sites/${siteId}/lists?$filter=displayName eq '${CONFIG.listName}'`, { headers: { Authorization: 'Bearer ' + token } });
+  const lists = await lr.json();
+  const listId = lists.value?.[0]?.id;
+  if (!listId) throw new Error('List not found: ' + CONFIG.listName);
+  _spSiteIdResolved = siteId;
+  _spListId = listId;
+  return { siteId, listId };
+}
+
 async function spGet(key) {
   if (_spCache[key] !== undefined) return _spCache[key].v;
   try {
-    const r = await fetch('/api/data?key=' + encodeURIComponent(key));
-    if (r.status === 403) { _spCache[key] = { v: null }; return null; } // not authorised — server said no
-    if (!r.ok) throw new Error('api ' + r.status);
+    const token = await getGraphToken();
+    if (!token) return localStorage.getItem('rsb_sp_' + key);
+    const { siteId, listId } = await resolveSpIds();
+    const r = await fetch(
+      `${GRAPH}/sites/${siteId}/lists/${listId}/items?$filter=fields/Title eq '${encodeURIComponent(key)}'&$expand=fields`,
+      { headers: { Authorization: 'Bearer ' + token, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } }
+    );
     const d = await r.json();
-    _spCache[key] = { v: d.value ?? null };
-    return _spCache[key].v;
+    const val = d.value?.[0]?.fields?.DataValue || null;
+    _spCache[key] = { v: val };
+    return val;
   } catch(e) {
-    console.error('spGet (api) error:', e);
-    // No silent localStorage fallback in SP_MODE: returning stale local
-    // data would undermine the server's access decision. Fail closed.
-    return null;
+    console.error('spGet error:', e);
+    return localStorage.getItem('rsb_sp_' + key);
   }
 }
 
@@ -606,20 +642,31 @@ async function spSet(key, value) {
   }
   showSaveInd();
   try {
-    const r = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value })
-    });
-    if (r.status === 403) {
-      console.warn('spSet refused by server (not authorised):', key);
-      // Server rejected the write — do NOT cache it as if it succeeded.
-      hideSaveInd();
-      return;
+    const token = await getGraphToken();
+    if (!token) throw new Error('No Graph token');
+    const { siteId, listId } = await resolveSpIds();
+    // Check if item exists
+    const r = await fetch(
+      `${GRAPH}/sites/${siteId}/lists/${listId}/items?$filter=fields/Title eq '${encodeURIComponent(key)}'&$expand=fields`,
+      { headers: { Authorization: 'Bearer ' + token, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } }
+    );
+    const d = await r.json();
+    const existing = d.value?.[0];
+    if (existing) {
+      await fetch(`${GRAPH}/sites/${siteId}/lists/${listId}/items/${existing.id}/fields`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ DataValue: value })
+      });
+    } else {
+      await fetch(`${GRAPH}/sites/${siteId}/lists/${listId}/items`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { Title: key, DataValue: value } })
+      });
     }
-    if (!r.ok) throw new Error('api ' + r.status);
     _spCache[key] = { v: value };
-  } catch(e) { console.error('spSet (api) error:', e); }
+  } catch(e) { console.error('spSet error:', e); }
   hideSaveInd();
 }
 function showSaveInd() { const el=document.getElementById('save-ind');if(el)el.className='save-ind show'; }
