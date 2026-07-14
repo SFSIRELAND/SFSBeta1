@@ -36,11 +36,6 @@
       "statusCode": 302
     }
   },
-  "globalHeaders": {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://alcdn.msauth.net; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; img-src 'self' data: blob:"
-  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/api/*", "/.auth/*"]
