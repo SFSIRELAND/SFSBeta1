@@ -10,7 +10,7 @@
         },
         "login": {
           "loginParameters": [
-            "scope=openid profile email offline_access https://graph.microsoft.com/Sites.ReadWrite.All"
+            "scope=openid profile email offline_access"
           ]
         }
       }
