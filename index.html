@@ -925,7 +925,7 @@ async function saveOpsAsync(ops){
 function getActiveId(){try{return localStorage.getItem('rsb_active')||null;}catch(e){return null;}}
 function setActiveId(id){try{localStorage.setItem('rsb_active',id);}catch(e){}}
 function loadSt(opId){try{const s=localStorage.getItem('rsb_st_'+(opId||activeId));if(s)return JSON.parse(s);}catch(e){}return {};}
-function saveSt(){if(isReadOnly()){showToast('Read-only access — changes are not saved','warn');return;}try{localStorage.setItem('rsb_st_'+activeId,JSON.stringify(state));}catch(e){}storageSet('state_'+activeId,JSON.stringify(state));showToast('Saved','ok');}
+async function saveSt(){if(isReadOnly()){showToast('Read-only access — changes are not saved','warn');return;}try{localStorage.setItem('rsb_st_'+activeId,JSON.stringify(state));}catch(e){}await storageSet('state_'+activeId,JSON.stringify(state));showToast('Saved','ok');}
 
 let ops=loadOps();
 let activeId=getActiveId()||ops[0].id;
@@ -1215,7 +1215,7 @@ function fmtTime(iso) {
     d.toLocaleTimeString('en-IE', {hour:'2-digit',minute:'2-digit'});
 }
 
-function addQuery(reqId) {
+async function addQuery(reqId) {
   const el = document.getElementById('qinput-' + reqId);
   if (!el || !el.value.trim()) return;
   const r = ensure(reqId);
@@ -1228,12 +1228,12 @@ function addQuery(reqId) {
     timestamp: new Date().toISOString(),
     replies: []
   });
-  saveSt();
+  await saveSt();
   showQF[reqId] = false;
   render();
 }
 
-function addReply(reqId, qIdx) {
+async function addReply(reqId, qIdx) {
   const key = reqId + '_' + qIdx;
   const el = document.getElementById('rinput-' + key);
   if (!el || !el.value.trim()) return;
@@ -1246,7 +1246,7 @@ function addReply(reqId, qIdx) {
     text: el.value.trim(),
     timestamp: new Date().toISOString()
   });
-  saveSt();
+  await saveSt();
   showRF[key] = false;
   render();
 }
