@@ -538,12 +538,27 @@ async function initApp() {
     if (data.clientPrincipal) {
       currentUser = data.clientPrincipal;
       hideLogin();
+      // Load operators from SharePoint before rendering
+      try {
+        const spOps = await storageGet('operators');
+        if (spOps) {
+          ops = JSON.parse(spOps);
+        }
+      } catch(e) { console.warn('Could not load operators from SP:', e); }
+      // Load state for active operator
+      try {
+        const spSt = await storageGet('state_' + activeId);
+        if (spSt) state = JSON.parse(spSt);
+      } catch(e) { console.warn('Could not load state from SP:', e); }
       // Land the user on an operator they're actually allowed to see
       const visible = getVisibleOps();
       if (visible.length && !visible.find(o=>o.id===activeId)) {
         activeId = visible[0].id;
         setActiveId(activeId);
-        state = loadSt(activeId);
+        try {
+          const spSt2 = await storageGet('state_' + activeId);
+          if (spSt2) state = JSON.parse(spSt2);
+        } catch(e) {}
       }
       renderUserPill();
       render();
@@ -903,10 +918,14 @@ function saveOps(ops){
   try{localStorage.setItem('rsb_ops',JSON.stringify(ops));}catch(e){}
   storageSet('operators', JSON.stringify(ops));
 }
+async function saveOpsAsync(ops){
+  try{localStorage.setItem('rsb_ops',JSON.stringify(ops));}catch(e){}
+  await storageSet('operators', JSON.stringify(ops));
+}
 function getActiveId(){try{return localStorage.getItem('rsb_active')||null;}catch(e){return null;}}
 function setActiveId(id){try{localStorage.setItem('rsb_active',id);}catch(e){}}
 function loadSt(opId){try{const s=localStorage.getItem('rsb_st_'+(opId||activeId));if(s)return JSON.parse(s);}catch(e){}return {};}
-function saveSt(){if(isReadOnly()){showToast('Read-only access — changes are not saved','warn');return;}try{localStorage.setItem('rsb_st_'+activeId,JSON.stringify(state));}catch(e){}showToast('Saved','ok');}
+function saveSt(){if(isReadOnly()){showToast('Read-only access — changes are not saved','warn');return;}try{localStorage.setItem('rsb_st_'+activeId,JSON.stringify(state));}catch(e){}storageSet('state_'+activeId,JSON.stringify(state));showToast('Saved','ok');}
 
 let ops=loadOps();
 let activeId=getActiveId()||ops[0].id;
