@@ -1056,10 +1056,17 @@ function renderOpTabs(){
   el.innerHTML=html;
 }
 
-function switchOp(id){
+async function switchOp(id){
   const visible = getVisibleOps();
   if (!visible.find(o=>o.id===id)) return; // not authorised to view this operator
-  activeId=id;setActiveId(id);state=loadSt(id);openCards={};cur='dash';filt='all';render();
+  activeId=id;setActiveId(id);
+  state=loadSt(id); // load from localStorage immediately for fast render
+  openCards={};cur='dash';filt='all';render();
+  // Then load fresh from SharePoint and re-render
+  try {
+    const spSt = await storageGet('state_' + id);
+    if (spSt) { state = JSON.parse(spSt); render(); }
+  } catch(e) { console.warn('switchOp SP load error:', e); }
 }
 
 function openAddModal(){selColor=OP_COLORS[ops.length%OP_COLORS.length];renderModal('add');}
@@ -1492,14 +1499,11 @@ function renderSidebar(){
   const pcP=Math.round(((pcSt.c+pcSt.na)/Math.max(pcSt.total,1))*100);
   const euP=Math.round(((euSt.c+euSt.na)/Math.max(euSt.total,1))*100);
   function pill(st,sna){if(sna)return`<span class="npill p-none">N/A?</span>`;const done=st.c+st.na;const cls=st.nc>0?'p-nc':done===st.total&&st.total>0?'p-done':done>0?'p-part':'p-none';const lbl=st.nc>0?`${st.nc}NC`:`${done}/${st.total}`;return`<span class="npill ${cls}">${lbl}</span>`;}
-  // Count all queries across all operators
+  // Count all queries across all operators using in-memory state (loaded from SharePoint)
   let totalQ = 0;
-  ops.forEach(op => {
-    const s = loadSt(op.id);
-    REQS.forEach(r => {
-      const rs = s[r.id] || {};
-      (rs.queries||[]).forEach(q => { totalQ += 1 + (q.replies||[]).length; });
-    });
+  REQS.forEach(r => {
+    const rs = state[r.id] || {};
+    (rs.queries||[]).forEach(q => { totalQ += 1 + (q.replies||[]).length; });
   });
   const qBadge = totalQ > 0 ? `<span class="sb-query-badge">${totalQ}</span>` : '';
 
