@@ -575,18 +575,43 @@ function msalLogout() {
 // ══════════════════════════════════════════════════
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 // ══════════════════════════════════════════════════
-// STORAGE — localStorage for beta
-// Simple browser storage for 3-user beta.
-// SharePoint integration to follow once login is stable.
+// STORAGE — SharePoint via /api/data Function
+// Function uses client credentials to write to SharePoint.
+// Falls back to localStorage if not authenticated or api unavailable.
 // ══════════════════════════════════════════════════
 async function spGet(key) {
-  return localStorage.getItem('rsb_' + key);
+  if (!SP_MODE || !currentUser) return localStorage.getItem('rsb_' + key);
+  try {
+    const r = await fetch('/api/data?key=' + encodeURIComponent(key));
+    if (!r.ok) throw new Error('api ' + r.status);
+    const d = await r.json();
+    return d.value ?? null;
+  } catch(e) {
+    console.error('spGet error:', e);
+    return localStorage.getItem('rsb_' + key);
+  }
 }
 
 async function spSet(key, value) {
-  try { localStorage.setItem('rsb_' + key, value); } catch(e) {}
+  if (!SP_MODE || !currentUser) {
+    try { localStorage.setItem('rsb_' + key, value); } catch(e) {}
+    showSaveInd();
+    setTimeout(hideSaveInd, 1000);
+    return;
+  }
   showSaveInd();
-  setTimeout(hideSaveInd, 1000);
+  try {
+    const r = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value })
+    });
+    if (!r.ok) throw new Error('api ' + r.status);
+  } catch(e) {
+    console.error('spSet error:', e);
+    try { localStorage.setItem('rsb_' + key, value); } catch(e2) {}
+  }
+  hideSaveInd();
 }
 function showSaveInd() { const el=document.getElementById('save-ind');if(el)el.className='save-ind show'; }
 function hideSaveInd() { const el=document.getElementById('save-ind');if(el)el.className='save-ind'; }
