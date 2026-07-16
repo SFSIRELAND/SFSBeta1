@@ -1499,23 +1499,23 @@ function renderSidebar(){
   const pcP=Math.round(((pcSt.c+pcSt.na)/Math.max(pcSt.total,1))*100);
   const euP=Math.round(((euSt.c+euSt.na)/Math.max(euSt.total,1))*100);
   function pill(st,sna){if(sna)return`<span class="npill p-none">N/A?</span>`;const done=st.c+st.na;const cls=st.nc>0?'p-nc':done===st.total&&st.total>0?'p-done':done>0?'p-part':'p-none';const lbl=st.nc>0?`${st.nc}NC`:`${done}/${st.total}`;return`<span class="npill ${cls}">${lbl}</span>`;}
-  // Inbox model: count queries where the LAST message is from the other party
-  // Admin sees: queries last replied to by a client (client is waiting for SFS response)
-  // Client sees: queries last replied to by admin/auditor (SFS has replied, client should read)
+  // Inbox badge: count queries where last message is from the OTHER party
+  // Uses same state source as renderQueryInbox for consistency
   const myRole = getUserRole();
   let pendingQ = 0;
-  REQS.forEach(r => {
-    const rs = state[r.id] || {};
-    (rs.queries||[]).forEach(q => {
-      // Build full message thread: original query + all replies
-      const thread = [{ role: q.role, author: q.author }];
-      (q.replies||[]).forEach(rep => thread.push({ role: rep.role, author: rep.author }));
-      const lastMsg = thread[thread.length - 1];
-      // If last message is from the OTHER party — it needs a response from me
-      const lastIsClient = lastMsg.role === 'client';
-      const lastIsAdmin = lastMsg.role === 'admin' || lastMsg.role === 'auditor';
-      if (myRole === 'admin' && lastIsClient) pendingQ++;
-      if (myRole === 'client' && lastIsAdmin) pendingQ++;
+  ops.forEach(op => {
+    const s = (op.id === activeId) ? state : loadSt(op.id);
+    REQS.forEach(r => {
+      const rs = s[r.id] || {};
+      (rs.queries||[]).forEach(q => {
+        const thread = [{ role: q.role }];
+        (q.replies||[]).forEach(rep => thread.push({ role: rep.role }));
+        const lastRole = thread[thread.length - 1].role;
+        const lastIsClient = lastRole === 'client';
+        const lastIsAdmin = lastRole === 'admin' || lastRole === 'auditor';
+        if (myRole === 'admin' && lastIsClient) pendingQ++;
+        if (myRole === 'client' && lastIsAdmin) pendingQ++;
+      });
     });
   });
   const qBadge = pendingQ > 0 ? `<span class="sb-query-badge">${pendingQ}</span>` : '';
@@ -1550,10 +1550,11 @@ function renderSidebar(){
 function renderQueryInbox() {
   let qinboxFilter = window._qinboxFilter || 'all';
 
-  // Gather all queries across all operators + requirements
+  // Gather all queries — use in-memory state (loaded from SharePoint)
+  // Note: for single-operator beta, state IS the current operator's state
   let items = [];
   ops.forEach(op => {
-    const s = loadSt(op.id);
+    const s = (op.id === activeId) ? state : loadSt(op.id);
     REQS.forEach(req => {
       const rs = s[req.id] || {};
       const qs = rs.queries || [];
