@@ -1499,13 +1499,26 @@ function renderSidebar(){
   const pcP=Math.round(((pcSt.c+pcSt.na)/Math.max(pcSt.total,1))*100);
   const euP=Math.round(((euSt.c+euSt.na)/Math.max(euSt.total,1))*100);
   function pill(st,sna){if(sna)return`<span class="npill p-none">N/A?</span>`;const done=st.c+st.na;const cls=st.nc>0?'p-nc':done===st.total&&st.total>0?'p-done':done>0?'p-part':'p-none';const lbl=st.nc>0?`${st.nc}NC`:`${done}/${st.total}`;return`<span class="npill ${cls}">${lbl}</span>`;}
-  // Count all queries across all operators using in-memory state (loaded from SharePoint)
-  let totalQ = 0;
+  // Inbox model: count queries where the LAST message is from the other party
+  // Admin sees: queries last replied to by a client (client is waiting for SFS response)
+  // Client sees: queries last replied to by admin/auditor (SFS has replied, client should read)
+  const myRole = getUserRole();
+  let pendingQ = 0;
   REQS.forEach(r => {
     const rs = state[r.id] || {};
-    (rs.queries||[]).forEach(q => { totalQ += 1 + (q.replies||[]).length; });
+    (rs.queries||[]).forEach(q => {
+      // Build full message thread: original query + all replies
+      const thread = [{ role: q.role, author: q.author }];
+      (q.replies||[]).forEach(rep => thread.push({ role: rep.role, author: rep.author }));
+      const lastMsg = thread[thread.length - 1];
+      // If last message is from the OTHER party — it needs a response from me
+      const lastIsClient = lastMsg.role === 'client';
+      const lastIsAdmin = lastMsg.role === 'admin' || lastMsg.role === 'auditor';
+      if (myRole === 'admin' && lastIsClient) pendingQ++;
+      if (myRole === 'client' && lastIsAdmin) pendingQ++;
+    });
   });
-  const qBadge = totalQ > 0 ? `<span class="sb-query-badge">${totalQ}</span>` : '';
+  const qBadge = pendingQ > 0 ? `<span class="sb-query-badge">${pendingQ}</span>` : '';
 
   let html=`<button class="nav-btn${cur==='dash'?' a-dash':''}" onclick="nav('dash')">${ICO.dash}<span>Dashboard</span></button>
   <button class="nav-btn${cur==='queries'?' a-dash':''}" onclick="nav('queries')" style="gap:9px">
