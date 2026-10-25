@@ -716,18 +716,18 @@ const OP_COLORS=['#2a9d52','#2563eb','#7c3aed','#ea580c','#db2777'];
 const MAX_OPS=1; // single-client build: one operator/facility only. Enforced server-side too.
 
 const PC=[
-  {id:'pc1',n:'P1',l:'Legality'},
-  {id:'pc2',n:'P2',l:'Planning, Monitoring & Improvement'},
-  {id:'pc3',n:'P3',l:'Efficient Production'},
-  {id:'pc4',n:'P4',l:'Human Rights & Working Conditions'},
-  {id:'pc5',n:'P5',l:'Rural & Social Development'},
-  {id:'pc6',n:'P6',l:'Food Security'},
-  {id:'pc7',n:'P7',l:'Conservation & Biodiversity'},
-  {id:'pc8',n:'P8',l:'Soil'},
-  {id:'pc9',n:'P9',l:'Water'},
-  {id:'pc10',n:'P10',l:'Air'},
-  {id:'pc11',n:'P11',l:'Technology & Inputs'},
-  {id:'pc12',n:'P12',l:'Land Rights'},
+  {id:'pc1',n:'P1',l:'Legality',ex:"Start with the Kilshane facility's current EPA licence (waste or industrial emissions licence) and company registration — covers permits/licences and shows no outstanding enforcement action."},
+  {id:'pc2',n:'P2',l:'Planning, Monitoring & Improvement',ex:"Bia Energy's Environmental & Social Management Plan (ESMP) — or, if one hasn't been built yet, the equivalent sustainability management documentation already in place for the ISCC certificate, as a starting point."},
+  {id:'pc3',n:'P3',l:'Efficient Production',ex:"The RSB GHG calculation workbook for the CO2/digestate streams, once populated with real Kilshane activity data — this is the core evidence for this Principle."},
+  {id:'pc4',n:'P4',l:'Human Rights & Working Conditions',ex:"Bia Energy's health & safety policy, plus a sample employment contract/HR policy covering working hours, pay and grievance handling."},
+  {id:'pc5',n:'P5',l:'Rural & Social Development',ex:"Likely low relevance for an industrial site in Dublin — a short note confirming Kilshane isn't in an IHDI-flagged region is probably enough here, rather than a formal document."},
+  {id:'pc6',n:'P6',l:'Food Security',ex:"Likely not triggered for an AD facility running on waste/residue feedstocks — a short confirmation note (no arable land or food-competing water use) is probably the right 'document' here."},
+  {id:'pc7',n:'P7',l:'Conservation & Biodiversity',ex:"Planning permission or site location documentation showing Kilshane isn't on or adjacent to a protected habitat (e.g. Natura 2000 / SAC / SPA)."},
+  {id:'pc8',n:'P8',l:'Soil',ex:"Since digestate goes out to local farmers as fertiliser, any nutrient/land-spreading management records for that digestate — otherwise the facility's own drainage/containment plan."},
+  {id:'pc9',n:'P9',l:'Water',ex:"Trade effluent discharge licence or water permit for the Kilshane site."},
+  {id:'pc10',n:'P10',l:'Air',ex:"Stack emissions monitoring records or air emissions conditions — often part of the same EPA licence as Principle 1."},
+  {id:'pc11',n:'P11',l:'Technology & Inputs',ex:"Chemical inventory and current Safety Data Sheets for anything used in the biogas upgrading / CO2 capture process."},
+  {id:'pc12',n:'P12',l:'Land Rights',ex:"Land title deed or lease agreement for the Kilshane site."},
 ];
 const EU=[
   {id:"eu1",n:"1",l:"General requirements"},
@@ -1980,6 +1980,7 @@ function renderSection(sid){
       <span class="chip ch-op">${st.open} Open</span>
     </div>
   </div>
+  ${isPC&&sec.ex?`<div class="guid pc" style="margin-bottom:14px"><div class="glbl">Suggested starter document for Bia Energy</div><p>${sec.ex}</p></div>`:''}
   <div class="fbar"><span class="flbl">Filter:</span>
     <button class="fbtn${filt==='all'?' fa':''}" onclick="setF('all')">All (${secReqs(sid).length})</button>
     <button class="fbtn${filt==='open'?' fa':''}" onclick="setF('open')">Open (${st.open})</button>
